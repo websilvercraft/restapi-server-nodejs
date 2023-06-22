@@ -1,51 +1,25 @@
 const http = require("http");
 const PORT = process.env.PORT || 5000;
 
-
-function ItemModel(){
-
-    this.create = (params) => {
-        console.log("creating new item", JSON.stringify(params))
-
-        return {code: "success", message: "item created"}
-    }
-
-    this.read = (id) => {
-        console.log("reading item", id)
-
-        return {code: "success", item:{ id: id, name: "item name" } }
-    }    
-
-    this.update = (id, params) => {
-        console.log("updating exiting item", id, JSON.stringify(params))
-
-        return {code: "success", message: `item with id: ${id} updated`}
-    }  
-    
-    this.delete = ( id ) => {
-        console.log("deleting item", id)
-
-        return {code: "success", message: `item with id: ${id} deleted`}
-    }
-
-    this.list = (  ) => {
-        console.log("list items")
-
-        return {code: "success", items:[{ id: "id1", name: "item name" }, { id: "id2", name: "item name" }] }
-    }    
-
-}
+const ItemModelMock = require('./ItemModelMock')
 
 let models = { 
-    "items": new ItemModel(),
+    "items": new ItemModelMock(),
     "users": {} // not implemented
 }
 
 /*
+invoking api using curl
 curl -X GET http://localhost:5000/api/items/ | jq
-curl -X GET http://localhost:5000/api/items/item_id/ | jq
-curl -X POST http://localhost:5000/api/items/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}' | jq
-curl -X PATCH http://localhost:5000/api/items/item_id/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}' | jq
+curl -X GET http://localhost:5000/api/items/id1/ | jq
+curl -X POST http://localhost:5000/api/items/ -H 'Content-Type: application/json'  -d '{"name":"item name"}' | jq
+curl -X PATCH http://localhost:5000/api/items/id1/ -H 'Content-Type: application/json'  -d '{"name":"item name changed"}' | jq
+curl -X DELETE http://localhost:5000/api/items/id1/ -H 'Content-Type: application/json' | jq
+
+calls generating errors:
+curl -X GET http://localhost:5000/api/items/null/ | jq
+curl -X PATCH http://localhost:5000/api/items/null/ -H 'Content-Type: application/json'  -d '{"name":"item name changed"}' | jq
+curl -X DELETE http://localhost:5000/api/items/null/ -H 'Content-Type: application/json' | jq
 */
 
 const server = http.createServer(async (req, res) => {
@@ -85,28 +59,33 @@ const server = http.createServer(async (req, res) => {
             info.post_data = JSON.parse(data)
         }
 
-        let modelResp = null
-        switch (req.method){
-            case 'GET': 
-                        (url.length === 2) 
-                            ? modelResp = models[url[1]].list() 
-                            : modelResp = models[url[1]].read(url[2])
-                        break;
-            case 'POST': 
-                        modelResp = models[url[1]].create(data);
-                        break;
-            case 'PATCH': 
-                        modelResp = models[url[1]].update(url[2], data);
-                         break;
-            case 'DELETE': 
-                        modelResp = models[url[1]].delete(url[2], data);
-                        break;
+        try {
+            switch (req.method){
+                case 'GET': 
+                            (url.length === 2 )
+                                ? modelResp = await models[url[1]].list() 
+                                : modelResp = await models[url[1]].read(url[2])
+                            break;
+                case 'POST': 
+                            modelResp = await models[url[1]].create(data);
+                            break;
+                case 'PATCH': 
+                            modelResp = await models[url[1]].update(url[2], data); 
+                            break;
+                case 'DELETE': 
+                            modelResp = await models[url[1]].delete(url[2], data); 
+                            break;
+            }
+            
+            // writing status code and header
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.write(JSON.stringify({ res: 'success', data: modelResp, request_info: info }))
+            res.end();
         }
-        
-        // writing status code and header
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.write(JSON.stringify({ res: 'success', data: modelResp, request_info: info}))
-        res.end();
+        catch(err){
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ res: 'error', message: "data error", error: err }));
+        }
     }
 
     // If no route present
