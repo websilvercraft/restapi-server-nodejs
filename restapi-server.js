@@ -2,44 +2,36 @@ const http = require("http");
 const PORT = process.env.PORT || 5000;
 
 
-function onGet(){
-    console.log()
-}
-
-function onPost(){
-    console.log()   
-}
-
 function ItemModel(){
 
     this.create = (params) => {
         console.log("creating new item", JSON.stringify(params))
 
-        return JSON.stringify({code: "success", message: "item created"} )
+        return {code: "success", message: "item created"}
     }
 
     this.read = (id) => {
         console.log("reading item", id)
 
-        return JSON.stringify({code: "success", item:{ id: id, name: "item name" } })
+        return {code: "success", item:{ id: id, name: "item name" } }
     }    
 
     this.update = (id, params) => {
         console.log("updating exiting item", id, JSON.stringify(params))
 
-        return JSON.stringify({code: "success", message: `item with id: ${id} updated`} )
+        return {code: "success", message: `item with id: ${id} updated`}
     }  
     
     this.delete = ( id ) => {
         console.log("deleting item", id)
 
-        return JSON.stringify({code: "success", message: `item with id: ${id} deleted`} )
+        return {code: "success", message: `item with id: ${id} deleted`}
     }
 
     this.list = (  ) => {
         console.log("list items")
 
-        return JSON.stringify({code: "success", items:[{ id: id, name: "item name" }, { id: id, name: "item name" }] })
+        return {code: "success", items:[{ id: "id1", name: "item name" }, { id: "id2", name: "item name" }] }
     }    
 
 }
@@ -50,10 +42,10 @@ let models = {
 }
 
 /*
-curl -X GET http://localhost:5000/api/items/
-curl -X GET http://localhost:5000/api/items/item_id/
-curl -X POST http://localhost:5000/api/items/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}'
-curl -X PATCH http://localhost:5000/api/items/item_id/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}'
+curl -X GET http://localhost:5000/api/items/ | jq
+curl -X GET http://localhost:5000/api/items/item_id/ | jq
+curl -X POST http://localhost:5000/api/items/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}' | jq
+curl -X PATCH http://localhost:5000/api/items/item_id/ -H 'Content-Type: application/json'  -d '{"post_request_data":"give me some data"}' | jq
 */
 
 const server = http.createServer(async (req, res) => {
@@ -90,20 +82,30 @@ const server = http.createServer(async (req, res) => {
 
             // in here we assume the data is in json format, but ideally the format of the data is specified in the header of the request,
             // so we know what type of data we need to process
-            info.post_data = JSON.stringify(data)
+            info.post_data = JSON.parse(data)
         }
 
         let modelResp = null
         switch (req.method){
-            case 'GET': (url.length === 2 ? modelResp = models[url[1]].list() : modelResp = models[url[1]].read(url[2])); break;
-            case 'POST': modelResp = models[url[1]].create(data); break;
-            case 'PATCH': modelResp = models[url[1]].update(url[2], data); break;
-            case 'DELETE': modelResp = models[url[1]].delete(url[2], data); break;
+            case 'GET': 
+                        (url.length === 2) 
+                            ? modelResp = models[url[1]].list() 
+                            : modelResp = models[url[1]].read(url[2])
+                        break;
+            case 'POST': 
+                        modelResp = models[url[1]].create(data);
+                        break;
+            case 'PATCH': 
+                        modelResp = models[url[1]].update(url[2], data);
+                         break;
+            case 'DELETE': 
+                        modelResp = models[url[1]].delete(url[2], data);
+                        break;
         }
         
         // writing status code and header
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.write(JSON.stringify({ res: 'success', data: modelResp, request_info: JSON.stringify(info) }))
+        res.write(JSON.stringify({ res: 'success', data: modelResp, request_info: info}))
         res.end();
     }
 
